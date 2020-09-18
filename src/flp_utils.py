@@ -3,6 +3,8 @@ import logging
 
 _logger = logging.getLogger('flp')
 
+# 2020-09-18: Works with 20.7.1.1173 (Windows)
+
 def dump_version(data):
     '''
     Dumps the version string of the FLP file.
@@ -28,10 +30,15 @@ def dump_version(data):
 
 def dump_audio_files(data, paths=None):
     '''
-    Dumps the paths of all audio files in the FLP in a list.
+    Dumps the paths of all audio files referenced in the FLP in a list.
 
     @param data: byte string of the FLP file
     @param paths: optional dict of FL path variables to paths
+
+    Common ones include:
+        %USERPROFILE%
+        %FLStudioFactoryData%
+        %FlStudioUserData%
     '''
     audio_file_paths = collections.OrderedDict()
 
@@ -70,7 +77,15 @@ def dump_audio_files(data, paths=None):
             _logger.debug('no audio path suffix found')
             break
 
+        # TODO: It's possible the paths are stored in double byte encoding and
+        # all my paths happen to be in ASCII
         audio_file_path = data[audio_path_index:audio_path_suffix_index:2].decode()
+
+        if audio_file_path[0] == '%':
+            for k, v in paths.items():
+                if audio_file_path.startswith(k):
+                    audio_file_path = audio_file_path.replace(k, v, 1)
+                    break
 
         if audio_file_path:
             audio_file_paths[audio_file_path] = None
