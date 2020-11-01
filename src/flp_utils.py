@@ -60,7 +60,8 @@ def dump_audio_files(data, paths=None):
             _logger.debug('no leading byte found')
             continue
 
-        partial_prefix_length = audio_path_prefix_index - audio_pre_prefix_index
+        partial_prefix_length = (audio_path_prefix_index -
+            audio_pre_prefix_index)
 
         # Arbitrary set to 6 to find the path should be enough
         # the longest I've seen is Äò \xc3\x84\xc3\xb2
@@ -79,7 +80,33 @@ def dump_audio_files(data, paths=None):
 
         # TODO: It's possible the paths are stored in double byte encoding and
         # all my paths happen to be in ASCII
-        audio_file_path = data[audio_path_index:audio_path_suffix_index:2].decode()
+        try:
+            audio_file_path = data[
+                audio_path_index:audio_path_suffix_index:2].decode()
+        except UnicodeDecodeError as e:
+            _logger.debug(e)
+            data_pos = audio_path_suffix_index + 2
+            continue
+
+        # TODO: Figure out what \x00\x04\x02 means, I get this sometimes
+        if audio_file_path == '\x00\x04\x02':
+            data_pos = audio_path_suffix_index + 2
+            continue
+
+        # TODO: Figure out why there are null bytes here
+        if not audio_file_path.replace('\x00', ''):
+            data_pos = audio_path_suffix_index + 2
+            continue
+
+        # TODO: Some audio paths have \x06 (^F/feed) in them, not sure why
+        # Basically the data looks like:
+        # s^@a^@w^@^F B^@a^@s^@s^@.^@w^@a^@v^@
+
+        if not audio_file_path:
+            _logger.debug('empty audio file path: {}:{}:2'.format(
+                audio_path_index, audio_path_suffix_index))
+            data_pos = audio_path_suffix_index + 2
+            continue
 
         if audio_file_path[0] == '%':
             for k, v in paths.items():
