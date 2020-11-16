@@ -1,11 +1,12 @@
 import collections
 import logging
+import pathlib
 
 _logger = logging.getLogger('flp')
 
 # 2020-09-18: Works with 20.7.1.1173 (Windows)
 
-def dump_version(data):
+def dump_version(data: bytes) -> str:
     '''
     Dumps the version string of the FLP file.
 
@@ -28,17 +29,18 @@ def dump_version(data):
 
     return data[version_index:null_byte_index].decode()
 
-def dump_audio_files(data, paths=None):
+def dump_audio_files(data: bytes, paths: dict=None) -> list:
     '''
     Dumps the paths of all audio files referenced in the FLP in a list.
 
     @param data: byte string of the FLP file
     @param paths: optional dict of FL path variables to paths
+                  (no surrounding %'s)
 
     Common ones include:
-        %USERPROFILE%
-        %FLStudioFactoryData%
-        %FlStudioUserData%
+        USERPROFILE
+        FLStudioFactoryData
+        FlStudioUserData
     '''
     audio_file_paths = collections.OrderedDict()
 
@@ -110,12 +112,15 @@ def dump_audio_files(data, paths=None):
 
         if audio_file_path[0] == '%':
             for k, v in paths.items():
-                if audio_file_path.startswith(k):
-                    audio_file_path = audio_file_path.replace(k, v, 1)
+                if audio_file_path[1:].startswith(k) and audio_file_path[
+                        1 + len(k)] == '%':
+                    # Strip leading separator because \ on Windows causes
+                    # the join to resolve to root of the drive
+                    audio_file_path = pathlib.Path(v).joinpath(
+                                          audio_file_path[3 + len(k):])
                     break
 
-        if audio_file_path:
-            audio_file_paths[audio_file_path] = None
+        audio_file_paths[str(audio_file_path)] = None
 
         data_pos = audio_path_suffix_index + 2
 
